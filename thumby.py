@@ -72,4 +72,4 @@ def make_app():
 
 
 if __name__ == "__main__":
-    make_app().run(threaded=True)
+    make_app().run(host="0.0.0.0", threaded=True)
