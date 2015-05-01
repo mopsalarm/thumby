@@ -11,19 +11,19 @@ import re
 import pathlib
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, send_file
-from first import first
 
 
 def make_thumbnail(url, target):
     path = pathlib.Path(tempfile.mkdtemp(suffix="thumby"))
     try:
-        command = ["avconv", "-i", url, "-r", "1", "-f", "image2", "-t", "3", "out-%d.jpg"]
+        command = ["avconv", "-i", url, "-vf", "scale=640:-1", "-f", "image2", "-t", "4", "out-%04d.jpg"]
         subprocess.check_call(command, cwd=str(path))
 
-        image = first(sorted(path.glob("out-*.jpg"), reverse=True))
-        if not image:
+        files = sorted(path.glob("out-*.jpg"), reverse=True)
+        if not files:
             raise IOError("could not generate thumbnail")
 
+        image = files[len(files) // 2]
         shutil.copy(str(image), str(target))
 
     finally:
