@@ -11,6 +11,7 @@ import re
 import pathlib
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, send_file
+from werkzeug.exceptions import abort
 
 
 def make_thumbnail(url, target):
@@ -65,6 +66,9 @@ def make_app():
     @app.route("/<url>/thumb.jpg")
     def thumbnail_route(url):
         url = base64.urlsafe_b64decode(url.encode("ascii")).strip()
+        if not re.match("^http://[^/]*pr0gramm.com/.*$", url):
+            return abort(403)
+
         image = thumby.thumbnail(url).result()
         return send_file(str(image), mimetype="image/jpeg")
 
