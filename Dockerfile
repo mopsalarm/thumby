@@ -1,15 +1,10 @@
-from yaronr/debian-wheezy
+from python:2-onbuild
 MAINTAINER Mopsalarm
 
-RUN apt-get update && apt-get install -y --force-yes libav-tools python-pip
+RUN apt-get update && apt-get install -y --force-yes libav-tools
 
-ADD requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
-
-ADD start.sh /app/start.sh
-ADD thumby.py /app/thumby.py
-
-CMD /bin/sh /app/start.sh
+# images are placed at /usr/src/app/images
+CMD python thumby.py
 
 EXPOSE 5000
 
