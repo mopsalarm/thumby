@@ -34,7 +34,7 @@ def make_thumbnail(url, target):
 class Thumby(object):
     def __init__(self):
         self.lock = threading.RLock()
-        self.pool = ThreadPoolExecutor(4)
+        self.pool = ThreadPoolExecutor(6)
         self.jobs = {}
 
         self.images = pathlib.Path("images/")
@@ -48,7 +48,13 @@ class Thumby(object):
             except KeyError:
                 future = self.pool.submit(self._thumbnail, url)
                 self.jobs[url] = future
+
+                future.add_done_callback(lambda f: self._remove(url))
                 return future
+
+    def _remove(self, url):
+        with self.lock:
+            self.jobs.pop(url)
 
     def _thumbnail(self, url):
         target = self.images / re.sub("[^a-z0-9]", "_", url.lower())
