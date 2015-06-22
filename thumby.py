@@ -8,12 +8,24 @@ import threading
 import base64
 import re
 
+import datadog
 import pathlib
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, send_file
 from werkzeug.exceptions import abort
 
 
+# initialize datadog
+datadog.initialize()
+stats = datadog.ThreadStats()
+stats.start()
+
+
+def metric_name(suffix):
+    return "pr0gramm.thumby.%s" % suffix
+
+
+@stats.timed(metric_name("convert"))
 def make_thumbnail(url, target):
     path = pathlib.Path(tempfile.mkdtemp(suffix="thumby"))
     try:
@@ -70,10 +82,14 @@ def make_app():
     app = Flask(__name__)
 
     @app.route("/<url>/thumb.jpg")
+    @stats.timed(metric_name("request"))
     def thumbnail_route(url):
         url = base64.urlsafe_b64decode(url.encode("ascii")).strip()
-        if not re.match("^http://[^/]*pr0gramm.com/.*$", url):
+        if not re.match("^https?://[^/]*pr0gramm.com/.*$", url):
             return abort(403)
+
+        # use only http
+        url = url.replace("https://", "http://")
 
         image = thumby.thumbnail(url).result()
         return send_file(str(image), mimetype="image/jpeg")
