@@ -10,9 +10,9 @@ import re
 
 import datadog
 import pathlib
-from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, send_file
 from werkzeug.exceptions import abort
+
 
 SECONDS_IN_YEAR = 365 * 24 * 3600
 
@@ -27,10 +27,12 @@ def metric_name(suffix):
 
 
 @stats.timed(metric_name("convert"))
-def make_thumbnail(url, target):
+def make_thumbnail(url):
     path = pathlib.Path(tempfile.mkdtemp(suffix="thumby"))
     try:
-        command = ["avconv", "-i", url, "-vf", "scale=640:-1", "-f", "image2", "-t", "4", "out-%04d.jpg"]
+        command = ["timeout", "-s", "KILL", "5s",
+                   "avconv", "-i", url, "-vf", "scale=640:-1", "-f", "image2", "-t", "4", "out-%04d.jpg"]
+
         subprocess.check_call(command, cwd=str(path))
 
         files = sorted(path.glob("out-*.jpg"), reverse=True)
@@ -38,47 +40,14 @@ def make_thumbnail(url, target):
             raise IOError("could not generate thumbnail")
 
         image = files[len(files) // 2]
-        shutil.copy(str(image), str(target))
+        return image.open("rb")
 
     finally:
         shutil.rmtree(str(path), ignore_errors=True)
 
 
-class Thumby(object):
-    def __init__(self):
-        self.lock = threading.RLock()
-        self.pool = ThreadPoolExecutor(6)
-        self.jobs = {}
-
-        self.images = pathlib.Path("images/")
-        if not self.images.exists():
-            self.images.mkdir()
-
-    def thumbnail(self, url):
-        with self.lock:
-            try:
-                return self.jobs[url]
-            except KeyError:
-                future = self.pool.submit(self._thumbnail, url)
-                self.jobs[url] = future
-
-                future.add_done_callback(lambda f: self._remove(url))
-                return future
-
-    def _remove(self, url):
-        with self.lock:
-            self.jobs.pop(url)
-
-    def _thumbnail(self, url):
-        target = self.images / re.sub("[^a-z0-9]", "_", url.lower())
-        if not target.exists() or not target.stat().st_size:
-            make_thumbnail(url, target)
-
-        return target
-
-
 def make_app():
-    thumby = Thumby()
+    lock = threading.Semaphore(4)
 
     app = Flask(__name__)
 
@@ -92,8 +61,11 @@ def make_app():
         # use only http
         url = url.replace("https://", "http://")
 
-        image = thumby.thumbnail(url).result()
-        return send_file(str(image), mimetype="image/jpeg", cache_timeout=SECONDS_IN_YEAR)
+        with lock:
+            image_fp = make_thumbnail(url)
+
+        return send_file(image_fp, mimetype="image/jpeg",
+                         add_etags=False, cache_timeout=SECONDS_IN_YEAR)
 
     return app
 
