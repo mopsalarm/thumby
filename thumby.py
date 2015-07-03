@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, send_file
 from werkzeug.exceptions import abort
 
+SECONDS_IN_YEAR = 365 * 24 * 3600
 
 # initialize datadog
 datadog.initialize()
@@ -92,7 +93,7 @@ def make_app():
         url = url.replace("https://", "http://")
 
         image = thumby.thumbnail(url).result()
-        return send_file(str(image), mimetype="image/jpeg")
+        return send_file(str(image), mimetype="image/jpeg", cache_timeout=SECONDS_IN_YEAR)
 
     return app
 
