@@ -26,11 +26,10 @@ def metric_name(suffix):
     return "pr0gramm.thumby.%s" % suffix
 
 
-@stats.timed(metric_name("convert"))
 def make_thumbnail(url):
     path = pathlib.Path(tempfile.mkdtemp(suffix="thumby"))
     try:
-        command = ["timeout", "-s", "KILL", "5s",
+        command = ["timeout", "-s", "KILL", "8s",
                    "avconv", "-i", url, "-vf", "scale=640:-1", "-f", "image2", "-t", "4", "out-%04d.jpg"]
 
         subprocess.check_call(command, cwd=str(path))
@@ -61,8 +60,12 @@ def make_app():
         # use only http
         url = url.replace("https://", "http://")
 
-        with lock:
-            image_fp = make_thumbnail(url)
+        try:
+            with lock:
+                image_fp = make_thumbnail(url)
+        except:
+            stats.increment(metric_name("error"))
+            raise
 
         return send_file(image_fp, mimetype="image/jpeg",
                          add_etags=False, cache_timeout=SECONDS_IN_YEAR)
