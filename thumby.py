@@ -29,8 +29,8 @@ def metric_name(suffix):
 def make_thumbnail(url):
     path = pathlib.Path(tempfile.mkdtemp(suffix="thumby"))
     try:
-        command = ["timeout", "-s", "KILL", "8s",
-                   "avconv", "-i", url, "-vf", "scale=640:-1", "-f", "image2", "-t", "4", "out-%04d.jpg"]
+        command = ["timeout", "-s", "KILL", "10s",
+                   "ffmpeg", "-i", url, "-vf", "scale=640:-1", "-f", "image2", "-t", "3", "-r", "1", "out-%04d.jpg"]
 
         subprocess.check_call(command, cwd=str(path))
 
@@ -38,8 +38,7 @@ def make_thumbnail(url):
         if not files:
             raise IOError("could not generate thumbnail")
 
-        image = files[len(files) // 2]
-        return image.open("rb")
+        return files[-1].open("rb")
 
     finally:
         shutil.rmtree(str(path), ignore_errors=True)
