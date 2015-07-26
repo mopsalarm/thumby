@@ -1,2 +1,2 @@
 #!/bin/sh
-apk --update add tar xz curl timeout
+apk --update add tar xz curl coreutils
