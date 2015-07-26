@@ -1,6 +1,3 @@
-from __future__ import division
-from __future__ import unicode_literals
-
 import shutil
 import tempfile
 import subprocess
@@ -52,7 +49,7 @@ def make_app():
     @app.route("/<url>/thumb.jpg")
     @stats.timed(metric_name("request"))
     def thumbnail_route(url):
-        url = base64.urlsafe_b64decode(url.encode("ascii")).strip()
+        url = base64.urlsafe_b64decode(url.encode("ascii")).strip().decode("utf8")
         if not re.match("^https?://[^/]*pr0gramm.com/.*$", url):
             return abort(403)
 
@@ -73,4 +70,4 @@ def make_app():
 
 
 if __name__ == "__main__":
-    make_app().run(host="0.0.0.0", threaded=True)
+    make_app().run(host="0.0.0.0", debug=True, threaded=True)
