@@ -12,5 +12,4 @@ RUN apk del tar xz curl
 
 EXPOSE 5000
 
-WORKDIR /data
-CMD /env/bin/python /app/thumby.py
+CMD /env/bin/python thumby.py
