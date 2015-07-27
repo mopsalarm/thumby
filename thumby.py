@@ -7,9 +7,9 @@ import re
 
 import datadog
 import pathlib
-from flask import Flask, send_file
-from werkzeug.exceptions import abort
+import bottle
 
+from first import first
 
 SECONDS_IN_YEAR = 365 * 24 * 3600
 
@@ -31,43 +31,35 @@ def make_thumbnail(url):
 
         subprocess.check_call(command, cwd=str(path))
 
-        files = sorted(path.glob("out-*.jpg"), reverse=True)
-        if not files:
+        thumb = first(sorted(path.glob("out-*.jpg"), reverse=True))
+        if not thumb:
             raise IOError("could not generate thumbnail")
 
-        return files[-1].open("rb")
+        return thumb.open("rb")
 
     finally:
         shutil.rmtree(str(path), ignore_errors=True)
 
 
-def make_app():
-    lock = threading.Semaphore(4)
+lock = threading.Semaphore(4)
 
-    app = Flask(__name__)
+@bottle.route("/:url/thumb.jpg")
+@stats.timed(metric_name("request"))
+def thumbnail_route(url):
+    url = base64.urlsafe_b64decode(url.encode("ascii")).strip().decode("utf8")
+    if not re.match("^https?://[^/]*pr0gramm.com/.*$", url):
+        return bottle.abort(403)
 
-    @app.route("/<url>/thumb.jpg")
-    @stats.timed(metric_name("request"))
-    def thumbnail_route(url):
-        url = base64.urlsafe_b64decode(url.encode("ascii")).strip().decode("utf8")
-        if not re.match("^https?://[^/]*pr0gramm.com/.*$", url):
-            return abort(403)
+    # use only http
+    url = url.replace("https://", "http://")
 
-        # use only http
-        url = url.replace("https://", "http://")
+    try:
+        with lock:
+            image_fp = make_thumbnail(url)
+    except:
+        stats.increment(metric_name("error"))
+        raise
 
-        try:
-            with lock:
-                image_fp = make_thumbnail(url)
-        except:
-            stats.increment(metric_name("error"))
-            raise
-
-        return send_file(image_fp, mimetype="image/jpeg",
-                         add_etags=False, cache_timeout=SECONDS_IN_YEAR)
-
-    return app
-
-
-if __name__ == "__main__":
-    make_app().run(host="0.0.0.0", debug=True, threaded=True)
+    bottle.response.add_header("Content-Type", "image/jpeg")
+    bottle.response.add_header("Cache-Control", "max-age: {}".format(SECONDS_IN_YEAR))
+    return image_fp
