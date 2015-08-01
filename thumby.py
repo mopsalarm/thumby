@@ -61,5 +61,5 @@ def thumbnail_route(url):
         raise
 
     bottle.response.add_header("Content-Type", "image/jpeg")
-    bottle.response.add_header("Cache-Control", "max-age: {}".format(SECONDS_IN_YEAR))
+    bottle.response.add_header("Cache-Control", "max-age={}".format(SECONDS_IN_YEAR))
     return image_fp
