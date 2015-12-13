@@ -1,14 +1,13 @@
-import shutil
-import tempfile
-import subprocess
-import threading
 import base64
-import re
-
-import datadog
 import pathlib
-import bottle
+import re
+import shutil
+import subprocess
+import tempfile
+import threading
 
+import bottle
+import datadog
 from first import first
 
 SECONDS_IN_YEAR = 365 * 24 * 3600
@@ -17,6 +16,8 @@ SECONDS_IN_YEAR = 365 * 24 * 3600
 datadog.initialize()
 stats = datadog.ThreadStats()
 stats.start()
+
+lock = threading.Semaphore(4)
 
 
 def metric_name(suffix):
@@ -27,11 +28,12 @@ def make_thumbnail(url):
     path = pathlib.Path(tempfile.mkdtemp(suffix="thumby"))
     try:
         command = ["timeout", "-s", "KILL", "10s",
-                   "ffmpeg", "-i", url, "-vf", "scale=640:-1", "-f", "image2", "-t", "3", "-r", "1", "out-%04d.jpg"]
+                   "ffmpeg", "-y", "-i", url, "-vf", "scale='if(gt(iw,1024),1024,iw)':-1",
+                   "-f", "image2", "-t", "3", "-r", "1", "-q:v", "20", "out-%04d.webp"]
 
         subprocess.check_call(command, cwd=str(path))
 
-        thumb = first(sorted(path.glob("out-*.jpg"), reverse=True))
+        thumb = first(sorted(path.glob("out-*.webp"), reverse=True))
         if not thumb:
             raise IOError("could not generate thumbnail")
 
@@ -41,9 +43,7 @@ def make_thumbnail(url):
         shutil.rmtree(str(path), ignore_errors=True)
 
 
-lock = threading.Semaphore(4)
-
-@bottle.route("/:url/thumb.jpg")
+@bottle.route("/:url")
 @stats.timed(metric_name("request"))
 def thumbnail_route(url):
     url = base64.urlsafe_b64decode(url.encode("ascii")).strip().decode("utf8")
@@ -60,6 +60,6 @@ def thumbnail_route(url):
         stats.increment(metric_name("error"))
         raise
 
-    bottle.response.add_header("Content-Type", "image/jpeg")
+    bottle.response.add_header("Content-Type", "image/webp")
     bottle.response.add_header("Cache-Control", "max-age={}".format(SECONDS_IN_YEAR))
     return image_fp
